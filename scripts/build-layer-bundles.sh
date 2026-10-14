@@ -164,7 +164,7 @@ build_target() {
             ensure_host_cxx
             cmake_args+=(
                 -DCMAKE_CXX_COMPILER="$HOST_CXX"
-                "-DCMAKE_SHARED_LINKER_FLAGS=-static-libstdc++ -static-libgcc"
+                "-DCMAKE_SHARED_LINKER_FLAGS=-static-libstdc++ -static-libgcc -Wl,--exclude-libs,ALL"
             )
             ;;
         glibc-aarch64)
@@ -173,7 +173,7 @@ build_target() {
                 -DCMAKE_SYSTEM_NAME=Linux
                 -DCMAKE_SYSTEM_PROCESSOR=aarch64
                 -DCMAKE_CXX_COMPILER="$GLIBC_AARCH64_CXX"
-                "-DCMAKE_SHARED_LINKER_FLAGS=-static-libstdc++ -static-libgcc"
+                "-DCMAKE_SHARED_LINKER_FLAGS=-static-libstdc++ -static-libgcc -Wl,--exclude-libs,ALL"
             )
             ;;
         android-arm64-v8a)
