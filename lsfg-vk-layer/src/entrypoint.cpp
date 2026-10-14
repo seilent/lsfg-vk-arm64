@@ -7,10 +7,13 @@
 #include "swapchain.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <exception>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -39,6 +42,72 @@ namespace {
         std::unordered_map<VkSwapchainKHR, ls::R<vk::Vulkan>> swapchains;
         std::unordered_map<VkSwapchainKHR, SwapchainInfo> swapchainInfos;
     }* instance_info; // NOLINT (global variable)
+
+    struct PresentWaitState {
+        std::mutex mutex;
+        std::unordered_map<VkDevice, PFN_vkWaitForPresentKHR> wait;
+#ifdef VK_KHR_present_wait2
+        std::unordered_map<VkDevice, PFN_vkWaitForPresent2KHR> wait2;
+#endif
+        std::unordered_map<VkSwapchainKHR, std::deque<uint64_t>> ids;
+        std::atomic<uint32_t> offset{0};
+    };
+    PresentWaitState& present_wait = *new PresentWaitState; // NOLINT (global variable)
+
+    void syncPresentWaitOffset() {
+        present_wait.offset.store(layer_info->root.presentWaitOffset());
+    }
+
+    uint64_t remapPresentId(VkSwapchainKHR swapchain, uint64_t id) {
+        const uint32_t offset = present_wait.offset.load();
+        if (!offset)
+            return id;
+
+        const auto it = present_wait.ids.find(swapchain);
+        if (it == present_wait.ids.end())
+            return id;
+
+        const auto& ids = it->second;
+        const auto pos = std::ranges::find(ids, id);
+        if (pos == ids.end())
+            return id;
+
+        const auto index = static_cast<size_t>(pos - ids.begin());
+        return index >= offset ? ids.at(index - offset) : id;
+    }
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-warning-option"
+#pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
+    void recordPresentId(const VkPresentInfoKHR* info, size_t index, VkSwapchainKHR swapchain) {
+        uint64_t id{};
+        for (const auto* chain = static_cast<const VkBaseInStructure*>(info->pNext);
+                chain && !id; chain = chain->pNext) {
+            if (chain->sType == VK_STRUCTURE_TYPE_PRESENT_ID_KHR) {
+                const auto* ids = reinterpret_cast<const VkPresentIdKHR*>(chain);
+                if (ids->pPresentIds && index < ids->swapchainCount)
+                    id = ids->pPresentIds[index];
+            }
+#ifdef VK_KHR_present_id2
+            if (chain->sType == VK_STRUCTURE_TYPE_PRESENT_ID_2_KHR) {
+                const auto* ids = reinterpret_cast<const VkPresentId2KHR*>(chain);
+                if (ids->pPresentIds && index < ids->swapchainCount)
+                    id = ids->pPresentIds[index];
+            }
+#endif
+        }
+        if (!id)
+            return;
+
+        const std::scoped_lock lock(present_wait.mutex);
+        auto& ids = present_wait.ids[swapchain];
+        if (!ids.empty() && ids.back() == id)
+            return;
+        ids.push_back(id);
+        if (ids.size() > ls::MAX_PRESENT_WAIT_OFFSET + 1)
+            ids.pop_front();
+    }
+#pragma clang diagnostic pop
 
     // create instance
     VkResult myvkCreateInstance(
@@ -177,6 +246,16 @@ namespace {
             return e.error();
         }
 
+        {
+            const std::scoped_lock lock(present_wait.mutex);
+            present_wait.wait[*device] = reinterpret_cast<PFN_vkWaitForPresentKHR>(
+                instance_info->funcs.GetDeviceProcAddr(*device, "vkWaitForPresentKHR"));
+#ifdef VK_KHR_present_wait2
+            present_wait.wait2[*device] = reinterpret_cast<PFN_vkWaitForPresent2KHR>(
+                instance_info->funcs.GetDeviceProcAddr(*device, "vkWaitForPresent2KHR"));
+#endif
+        }
+
         // create layer instance
         try {
             instance_info->devices.emplace(
@@ -202,6 +281,14 @@ namespace {
         auto it = instance_info->devices.find(device);
         if (it != instance_info->devices.end())
             instance_info->devices.erase(it);
+
+        {
+            const std::scoped_lock lock(present_wait.mutex);
+            present_wait.wait.erase(device);
+#ifdef VK_KHR_present_wait2
+            present_wait.wait2.erase(device);
+#endif
+        }
 
         // destroy device
         auto vkDestroyDevice = reinterpret_cast<PFN_vkDestroyDevice>(
@@ -252,6 +339,13 @@ namespace {
     PFN_vkVoidFunction myvkGetInstanceProcAddr(VkInstance instance, const char* name) {
         if (!name) return nullptr;
 
+        if (std::string(name) == "vkWaitForPresentKHR"
+                || std::string(name) == "vkWaitForPresent2KHR") {
+            if (!layer_info->GetInstanceProcAddr
+                    || !layer_info->GetInstanceProcAddr(instance, name))
+                return nullptr;
+        }
+
         auto func = getProcAddr(name);
         if (func) return func;
 
@@ -262,6 +356,13 @@ namespace {
     // get device-level function pointers
     PFN_vkVoidFunction myvkGetDeviceProcAddr(VkDevice device, const char* name) {
         if (!name) return nullptr;
+
+        if (std::string(name) == "vkWaitForPresentKHR"
+                || std::string(name) == "vkWaitForPresent2KHR") {
+            if (!instance_info->funcs.GetDeviceProcAddr
+                    || !instance_info->funcs.GetDeviceProcAddr(device, name))
+                return nullptr;
+        }
 
         auto func = getProcAddr(name);
         if (func) return func;
@@ -296,6 +397,7 @@ namespace {
             }
 
             layer_info->root.update(); // ensure config is up to date
+            syncPresentWaitOffset();
 
             // create swapchain
             VkSwapchainCreateInfoKHR newInfo = *info;
@@ -360,6 +462,7 @@ namespace {
         } catch (const std::exception&) {
             reload = false; // ignore parse errors
         }
+        syncPresentWaitOffset();
 
         if (reload) {
             try {
@@ -412,6 +515,9 @@ namespace {
                 result = VK_ERROR_UNKNOWN;
             }
 
+            if (result >= 0)
+                recordPresentId(info, i, swapchain);
+
             if (result != VK_SUCCESS && info->pResults)
                 info->pResults[i] = result;
         }
@@ -419,6 +525,41 @@ namespace {
         return result;
 #pragma clang diagnostic pop
     }
+
+    VkResult myvkWaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain,
+            uint64_t presentId, uint64_t timeout) {
+        PFN_vkWaitForPresentKHR next{};
+        {
+            const std::scoped_lock lock(present_wait.mutex);
+            const auto it = present_wait.wait.find(device);
+            if (it != present_wait.wait.end())
+                next = it->second;
+            presentId = remapPresentId(swapchain, presentId);
+        }
+        if (!next)
+            return VK_ERROR_UNKNOWN;
+
+        return next(device, swapchain, presentId, timeout);
+    }
+
+#ifdef VK_KHR_present_wait2
+    VkResult myvkWaitForPresent2KHR(VkDevice device, VkSwapchainKHR swapchain,
+            const VkPresentWait2InfoKHR* info) {
+        PFN_vkWaitForPresent2KHR next{};
+        VkPresentWait2InfoKHR remapped = *info;
+        {
+            const std::scoped_lock lock(present_wait.mutex);
+            const auto it = present_wait.wait2.find(device);
+            if (it != present_wait.wait2.end())
+                next = it->second;
+            remapped.presentId = remapPresentId(swapchain, info->presentId);
+        }
+        if (!next)
+            return VK_ERROR_UNKNOWN;
+
+        return next(device, swapchain, &remapped);
+    }
+#endif
 
     void myvkDestroySwapchainKHR(
             VkDevice device,
@@ -437,6 +578,11 @@ namespace {
             instance_info->swapchains.erase(mapping);
 
         layer_info->root.removeSwapchainContext(swapchain);
+
+        {
+            const std::scoped_lock lock(present_wait.mutex);
+            present_wait.ids.erase(swapchain);
+        }
 
         // destroy swapchain
         it->second.df().DestroySwapchainKHR(device, swapchain, alloc);
@@ -472,7 +618,11 @@ VkResult vkNegotiateLoaderLayerInterfaceVersion(VkNegotiateLayerInterface* pVers
                 { "vkDestroyInstance", VKPTR(myvkDestroyInstance) },
                 { "vkCreateSwapchainKHR", VKPTR(myvkCreateSwapchainKHR) },
                 { "vkQueuePresentKHR", VKPTR(myvkQueuePresentKHR) },
-                { "vkDestroySwapchainKHR", VKPTR(myvkDestroySwapchainKHR) }
+                { "vkDestroySwapchainKHR", VKPTR(myvkDestroySwapchainKHR) },
+                { "vkWaitForPresentKHR", VKPTR(myvkWaitForPresentKHR) },
+#ifdef VK_KHR_present_wait2
+                { "vkWaitForPresent2KHR", VKPTR(myvkWaitForPresent2KHR) },
+#endif
 #undef VKPTR
             },
             .root = Root()
@@ -484,6 +634,7 @@ VkResult vkNegotiateLoaderLayerInterfaceVersion(VkNegotiateLayerInterface* pVers
 
             return VK_ERROR_INITIALIZATION_FAILED;
         }
+        syncPresentWaitOffset();
     } catch (const std::exception& e) {
         std::cerr << "lsfg-vk: something went wrong during lsfg-vk layer initialization:\n";
         std::cerr << "- " << e.what() << '\n';

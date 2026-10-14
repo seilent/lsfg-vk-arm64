@@ -41,7 +41,10 @@ namespace ls {
         bool performance_mode{false};
         /// pacing method
         Pacing pacing{Pacing::None};
+        uint32_t present_wait_offset{0};
     };
+
+    inline constexpr uint32_t MAX_PRESENT_WAIT_OFFSET{8};
 
     /// parsed configuration file
     class ConfigFile {

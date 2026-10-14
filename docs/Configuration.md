@@ -21,9 +21,10 @@ Next is a list of all available **profile** configuration options:
 - **Performance Mode / `performance_mode`**: When enabled, a significantly lighter frame generation model is used. This has a minor quality impact, but greatly improves performance. 
 (Default: `false`)
 - **Pacing Mode / `pacing`**: This option is explained in greater detail below. Supported values are **None / `none`**.
+- **`present_wait_offset`**: When the application waits for its frames to be presented (`vkWaitForPresentKHR`, `vkWaitForPresent2KHR`, used by DXVK), lsfg-vk answers each wait as soon as the frame this many presents earlier is done. The application can then render that many frames further ahead, at the cost of latency. Integer from 0 to 8. (Default: `0`)
 - **GPU / `gpu`**: The GPU to use for frame generation. This MUST be the **same GPU** as the one being used by the application. **Dual GPU is NOT supported**. You can identify a GPU through its name (e.g. `NVIDIA GeForce RTX 3080`), uppercase-only ID (e.g. `0x10DE:0x2C02`) or PCI bus ID (e.g. `3:0.0`). If not specified, the primary GPU will be used, which may lead to issues.
 
-The "Multiplier", "Flow Scale" and "Performance Mode" options can be **hot-reloaded**, meaning that changes to these options will take effect immediately without needing to restart the application. Options such as "Pacing Mode" or removal of the profile require a swapchain recreation, which usually means resizing or restarting the application. Any other change requires an application restart. 
+The "Multiplier", "Flow Scale", "Performance Mode" and `present_wait_offset` options can be **hot-reloaded** (not when using `LSFGVK_ENV`), meaning that changes to these options will take effect immediately without needing to restart the application. Options such as "Pacing Mode" or removal of the profile require a swapchain recreation, which usually means resizing or restarting the application. Any other change requires an application restart. 
 
 ### Pacing Modes
 
@@ -51,4 +52,5 @@ If you do not wish to use a configuration file, you can also set configuration o
 - `LSFGVK_FLOW_SCALE`: Flow scale value.
 - `LSFGVK_PERFORMANCE_MODE`: If set to `1`, performance mode will be enabled.
 - `LSFGVK_PACING`: Pacing mode to use.
+- `LSFGVK_PRESENT_WAIT_OFFSET`: Present wait offset.
 - `LSFGVK_GPU`: GPU to use for frame generation.

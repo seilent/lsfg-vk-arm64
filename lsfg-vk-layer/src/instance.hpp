@@ -9,6 +9,7 @@
 #include "lsfg-vk-common/vulkan/vulkan.hpp"
 #include "swapchain.hpp"
 
+#include <cstdint>
 #include <optional>
 #include <unordered_map>
 
@@ -26,6 +27,9 @@ namespace lsfgvk::layer {
         /// check if the layer is active
         /// @return true if active
         [[nodiscard]] bool active() const { return this->active_profile.has_value(); }
+        [[nodiscard]] uint32_t presentWaitOffset() const {
+            return this->active_profile ? this->active_profile->present_wait_offset : 0;
+        }
 
         /// ensure the layer is up-to-date
         /// @return true if the configuration was updated

@@ -3,6 +3,7 @@
 #include "lsfg-vk-common/configuration/config.hpp"
 #include "lsfg-vk-common/helpers/errors.hpp"
 
+#include <charconv>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
@@ -106,6 +107,26 @@ namespace {
             return Pacing::None;
         throw ls::error("unknown pacing method: " + str);
     }
+    [[noreturn]] void throwPresentWaitOffsetError() {
+        throw ls::error("present_wait_offset must be an integer between 0 and "
+            + std::to_string(MAX_PRESENT_WAIT_OFFSET));
+    }
+    uint32_t presentWaitOffsetFromToml(const toml::node_view<const toml::node>& val) {
+        if (!val)
+            return 0;
+        const auto offset = val.value<int64_t>();
+        if (!val.is_integer() || !offset || *offset < 0 || *offset > MAX_PRESENT_WAIT_OFFSET)
+            throwPresentWaitOffsetError();
+        return static_cast<uint32_t>(*offset);
+    }
+    uint32_t presentWaitOffsetFromString(const std::string& str) {
+        int64_t offset{};
+        const auto* end = str.data() + str.size();
+        const auto [ptr, ec] = std::from_chars(str.data(), end, offset);
+        if (ec != std::errc() || ptr != end || offset < 0 || offset > MAX_PRESENT_WAIT_OFFSET)
+            throwPresentWaitOffsetError();
+        return static_cast<uint32_t>(offset);
+    }
     /// parse the global configuration
     GlobalConf parseGlobalConf(const toml::table& tbl) {
         const GlobalConf conf{
@@ -127,7 +148,8 @@ namespace {
             .multiplier = tbl["multiplier"].value_or(2U),
             .flow_scale = tbl["flow_scale"].value_or(1.0F),
             .performance_mode = tbl["performance_mode"].value_or(false),
-            .pacing = parcingFromString(tbl["pacing"].value_or<std::string>("none"))
+            .pacing = parcingFromString(tbl["pacing"].value_or<std::string>("none")),
+            .present_wait_offset = presentWaitOffsetFromToml(tbl["present_wait_offset"])
         };
 
         if (conf.multiplier <= 1)
@@ -166,7 +188,8 @@ namespace {
             .multiplier = 2,
             .flow_scale = 1.0F,
             .performance_mode = false,
-            .pacing = Pacing::None
+            .pacing = Pacing::None,
+            .present_wait_offset = 0
         };
 
         const char* gpu = std::getenv("LSFGVK_GPU");
@@ -179,6 +202,8 @@ namespace {
         if (performance) conf.performance_mode = std::string(performance) == "1";
         const char* pacing = std::getenv("LSFGVK_PACING");
         if (pacing) conf.pacing = parcingFromString(std::string(pacing));
+        const char* offset = std::getenv("LSFGVK_PRESENT_WAIT_OFFSET");
+        if (offset) conf.present_wait_offset = presentWaitOffsetFromString(std::string(offset));
 
         if (conf.multiplier <= 1)
             throw ls::error("multiplier must be greater than 1");
@@ -247,6 +272,8 @@ void ConfigFile::write(const std::filesystem::path& path) const {
                 profile.insert("pacing", "none");
                 break;
         }
+        if (conf.present_wait_offset)
+            profile.insert("present_wait_offset", static_cast<int64_t>(conf.present_wait_offset));
 
         profiles.push_back(profile);
     }
