@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <ios>
 #include <optional>
 #include <string>
@@ -204,6 +205,8 @@ namespace {
         VkDevice handle{};
 
         nullDescriptorSupported = checkNullDescriptor(fi, physdev);
+        const bool globalPrioritySupported =
+            hasDeviceExtension(fi, physdev, VK_EXT_GLOBAL_PRIORITY_EXTENSION_NAME);
 
         const float queuePriority{1.0F}; // highest priority
         VkPhysicalDeviceRobustness2FeaturesEXT requestedRobustness2{
@@ -216,8 +219,13 @@ namespace {
             .shaderFloat16 = fp16,
             .timelineSemaphore = VK_TRUE
         };
-        const VkDeviceQueueCreateInfo requestedQueueInfo{
+        const VkDeviceQueueGlobalPriorityCreateInfoEXT requestedPriority{
+            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_EXT,
+            .globalPriority = VK_QUEUE_GLOBAL_PRIORITY_HIGH_EXT
+        };
+        VkDeviceQueueCreateInfo requestedQueueInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .pNext = globalPrioritySupported ? &requestedPriority : nullptr,
             .queueFamilyIndex = cfi,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority
@@ -229,7 +237,9 @@ namespace {
         };
         if (nullDescriptorSupported)
             requestedExtensions.push_back(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
-        const VkDeviceCreateInfo deviceInfo{
+        if (globalPrioritySupported)
+            requestedExtensions.push_back(VK_EXT_GLOBAL_PRIORITY_EXTENSION_NAME);
+        VkDeviceCreateInfo deviceInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
             .pNext = &requestedFeaturesVulkan12,
             .queueCreateInfoCount = 1,
@@ -238,6 +248,13 @@ namespace {
             .ppEnabledExtensionNames = requestedExtensions.data()
         };
         auto res = fi.CreateDevice(physdev, &deviceInfo, VK_NULL_HANDLE, &handle);
+        if (res == VK_ERROR_NOT_PERMITTED_EXT && globalPrioritySupported) {
+            std::cerr << "lsfg-vk: high priority queue not permitted, using the default priority\n";
+            requestedQueueInfo.pNext = nullptr;
+            requestedExtensions.pop_back();
+            deviceInfo.enabledExtensionCount = static_cast<uint32_t>(requestedExtensions.size());
+            res = fi.CreateDevice(physdev, &deviceInfo, VK_NULL_HANDLE, &handle);
+        }
         if (res != VK_SUCCESS)
             throw ls::vulkan_error(res, "vkCreateDevice() failed");
 
