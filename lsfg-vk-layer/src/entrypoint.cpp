@@ -518,7 +518,7 @@ namespace {
             if (result >= 0)
                 recordPresentId(info, i, swapchain);
 
-            if (result != VK_SUCCESS && info->pResults)
+            if (info->pResults)
                 info->pResults[i] = result;
         }
 
