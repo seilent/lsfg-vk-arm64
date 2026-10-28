@@ -16,6 +16,15 @@ target_compile_options(lsfg-vk-layer PRIVATE
 set_target_properties(lsfg-vk-layer PROPERTIES
     CXX_VISIBILITY_PRESET hidden)
 
+set(LSFGVK_LAYER_ENABLE_ENVIRONMENT_JSON "")
+if(LSFGVK_LAYER_ENABLE_ENVIRONMENT)
+    if(NOT LSFGVK_LAYER_ENABLE_ENVIRONMENT MATCHES "^[A-Za-z_][A-Za-z0-9_]*$")
+        message(FATAL_ERROR "LSFGVK_LAYER_ENABLE_ENVIRONMENT is not a valid variable name")
+    endif()
+    set(LSFGVK_LAYER_ENABLE_ENVIRONMENT_JSON
+        ",\n    \"enable_environment\": {\n      \"${LSFGVK_LAYER_ENABLE_ENVIRONMENT}\": \"1\"\n    }")
+endif()
+
 configure_file(
     "VkLayer_LSFGVK_frame_generation.json.in"
     "VkLayer_LSFGVK_frame_generation.json"

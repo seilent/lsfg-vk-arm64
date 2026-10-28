@@ -9,6 +9,6 @@
     "api_version": "1.4.328",
     "disable_environment": {
       "DISABLE_LSFGVK": "1"
-    }
+    }@LSFGVK_LAYER_ENABLE_ENVIRONMENT_JSON@
   }
 }
