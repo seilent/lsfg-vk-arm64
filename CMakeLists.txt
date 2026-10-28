@@ -12,6 +12,7 @@ set(LSFGVK_LAYER_LIBRARY_PATH liblsfg-vk-layer.so CACHE STRING "Change where Vul
 set(LSFGVK_LAYER_ENABLE_ENVIRONMENT "" CACHE STRING "Environment variable that must be 1 for Vulkan to load the layer")
 set(LSFGVK_VULKAN_HEADERS_DIR "" CACHE PATH "Optional custom Vulkan-Headers include directory")
 option(LSFGVK_TESTING_RENDERDOC  "Enable RenderDoc integration for testing purposes" OFF)
+option(LSFGVK_BUILD_TESTS        "Build the tests"                   OFF)
 # === READ HERE FOR BUILD OPTIONS ===
 
 add_library(lsfg-vk-build-config INTERFACE)
@@ -65,4 +66,8 @@ if(LSFGVK_BUILD_UI)
 endif()
 if(LSFGVK_BUILD_CLI)
     add_subdirectory(lsfg-vk-cli)
+endif()
+if(LSFGVK_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
