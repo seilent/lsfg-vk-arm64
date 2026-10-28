@@ -1,6 +1,7 @@
 set(LAYER_SOURCES
     "src/entrypoint.cpp"
     "src/instance.cpp"
+    "src/running_signal.cpp"
     "src/swapchain.cpp")
 
 add_library(lsfg-vk-layer SHARED ${LAYER_SOURCES})

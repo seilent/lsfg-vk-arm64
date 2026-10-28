@@ -2,6 +2,7 @@
 
 #include "instance.hpp"
 #include "lsfg-vk-common/helpers/paths.hpp"
+#include "running_signal.hpp"
 #include "swapchain.hpp"
 #include "lsfg-vk-common/configuration/detection.hpp"
 #include "lsfg-vk-common/helpers/errors.hpp"
@@ -19,6 +20,7 @@
 #include <vector>
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <vulkan/vulkan_core.h>
 
 using namespace lsfgvk;
@@ -203,6 +205,16 @@ void Root::createSwapchainContext(const vk::Vulkan& vk,
         }
 
         unsetenv("DISABLE_LSFGVK");
+
+        if (std::getenv("LSFGVK_ENV")) {
+            try {
+                this->running_signal = createRunningSignal(runningSignalDirectory(),
+                    runningSignalName(std::getenv("SteamGameId"), getpid()));
+            } catch (const std::exception& e) {
+                std::cerr << "lsfg-vk: unable to create the running signal:\n";
+                std::cerr << "- " << e.what() << '\n';
+            }
+        }
     }
 
     this->swapchains.emplace(swapchain,
