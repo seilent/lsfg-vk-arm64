@@ -51,7 +51,7 @@ jobs:
         id: setup-ndk
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r27c
+          ndk-version: r29
 
       - name: Build layer bundle
         env:

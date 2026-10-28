@@ -20,6 +20,7 @@ You will need the following dependencies:
 - Ninja build system (other build systems may work, but Ninja is recommended)
 - Vulkan SDK
 - Qt6 and Qt6Quick (only needed when building lsfg-vk-ui)
+- Android NDK r29 or newer (only needed for the Android layer bundles of `scripts/build-layer-bundles.sh`)
 
 The list of required packages may vary depending on your operating system. Below are the installation commands for some common Linux distributions.
 ```bash
