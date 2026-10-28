@@ -6,6 +6,8 @@
 #include "lsfg-vk-common/helpers/paths.hpp"
 
 #include <charconv>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
@@ -121,13 +123,32 @@ namespace {
             throwPresentWaitOffsetError();
         return static_cast<uint32_t>(*offset);
     }
-    uint32_t presentWaitOffsetFromString(const std::string& str) {
-        int64_t offset{};
+    template<typename T>
+    std::optional<T> parseExact(const std::string& str) {
+        T value{};
         const auto* end = str.data() + str.size();
-        const auto [ptr, ec] = std::from_chars(str.data(), end, offset);
-        if (ec != std::errc() || ptr != end || offset < 0 || offset > MAX_PRESENT_WAIT_OFFSET)
+        const auto [ptr, ec] = std::from_chars(str.data(), end, value);
+        if (ec != std::errc() || ptr != end)
+            return std::nullopt;
+        return value;
+    }
+    uint32_t presentWaitOffsetFromString(const std::string& str) {
+        const auto offset = parseExact<int64_t>(str);
+        if (!offset || *offset < 0 || *offset > MAX_PRESENT_WAIT_OFFSET)
             throwPresentWaitOffsetError();
-        return static_cast<uint32_t>(offset);
+        return static_cast<uint32_t>(*offset);
+    }
+    size_t multiplierFromString(const std::string& str) {
+        const auto multiplier = parseExact<size_t>(str);
+        if (!multiplier)
+            throw ls::error("multiplier must be an integer greater than 1");
+        return *multiplier;
+    }
+    float flowScaleFromString(const std::string& str) {
+        const auto flow = parseExact<float>(str);
+        if (!flow || std::isnan(*flow))
+            throw ls::error("flow_scale must be between 0.25 and 1.0");
+        return *flow;
     }
     /// parse the global configuration
     GlobalConf parseGlobalConf(const toml::table& tbl) {
@@ -187,7 +208,6 @@ namespace {
 
         return conf;
     }
-    /// parse a game profile configuration from the environment
     GameConf parseGameConfFromEnv() {
         GameConf conf{
             .name = "(environment)",
@@ -204,9 +224,9 @@ namespace {
         const char* gpu = std::getenv("LSFGVK_GPU");
         if (gpu) conf.gpu = std::string(gpu);
         const char* multiplier = std::getenv("LSFGVK_MULTIPLIER");
-        if (multiplier) conf.multiplier = static_cast<size_t>(std::stoul(multiplier));
+        if (multiplier) conf.multiplier = multiplierFromString(std::string(multiplier));
         const char* flow_scale = std::getenv("LSFGVK_FLOW_SCALE");
-        if (flow_scale) conf.flow_scale = std::stof(flow_scale);
+        if (flow_scale) conf.flow_scale = flowScaleFromString(std::string(flow_scale));
         const char* performance = std::getenv("LSFGVK_PERFORMANCE_MODE");
         if (performance) conf.performance_mode = std::string(performance) == "1";
         const char* pacing = std::getenv("LSFGVK_PACING");
