@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include "lsfg-vk-common/configuration/config.hpp"
+#include "lsfg-vk-common/helpers/dll_file.hpp"
 #include "lsfg-vk-common/helpers/errors.hpp"
+#include "lsfg-vk-common/helpers/paths.hpp"
 
 #include <charconv>
 #include <cstdint>
@@ -159,7 +161,6 @@ namespace {
 
         return conf;
     }
-    /// parse the global configuration from the environment
     GlobalConf parseGlobalConfFromEnv() {
         GlobalConf conf{
             .dll = std::nullopt,
@@ -175,6 +176,14 @@ namespace {
 
         if (conf.dll && !std::filesystem::exists(*conf.dll))
             throw ls::error("path to dll is invalid");
+        if (!conf.dll)
+            conf.dll = ls::findShaderDll().string();
+
+        try {
+            ls::validateShaderDll(*conf.dll, conf.allow_fp16);
+        } catch (const std::exception& e) {
+            throw ls::error("unable to use " + *conf.dll, e);
+        }
 
         return conf;
     }

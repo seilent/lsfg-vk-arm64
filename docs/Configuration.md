@@ -54,3 +54,5 @@ If you do not wish to use a configuration file, you can also set configuration o
 - `LSFGVK_PACING`: Pacing mode to use.
 - `LSFGVK_PRESENT_WAIT_OFFSET`: Present wait offset.
 - `LSFGVK_GPU`: GPU to use for frame generation.
+
+With `LSFGVK_ENV=1`, lsfg-vk checks Lossless.dll (`LSFGVK_DLL_PATH`, or the one found in the default locations) when the layer loads, the fp16 shaders too unless `LSFGVK_NO_FP16=1`. If Lossless.dll is not found or a shader it needs is missing or not SPIR-V, the layer does not load and the application runs without frame generation.
