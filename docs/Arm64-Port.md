@@ -21,9 +21,12 @@ for the Armada glibc layer: it targets Android/bionic and is a different Vulkan
 image-sharing ABI. Armada packages therefore use the glibc-aarch64 target and
 the same static `libstdc++`/`libgcc` runtime policy as the x86 Decky bundle.
 
-The glibc layer bundles link with `-Wl,--exclude-libs,ALL`, so the static
-`libstdc++` stays out of the layer's exported symbols. With them exported,
-Proton processes crash in the layer while it parses a float in the config.
+The layer links with the version script `lsfg-vk-layer/lsfg-vk-layer.map`,
+which exports only `vkNegotiateLoaderLayerInterfaceVersion`. The static C++
+runtime and the C++ code compiled into the layer stay out of its exported
+symbols. With them exported, Proton processes crash in the layer while it
+parses a float in the config. `tests/check-layer-exports.sh` checks the export
+list in `ctest` and in `tests/verify-decky-layer-archive.sh`.
 
 The backend device asks for a high priority queue (`VK_EXT_global_priority`). When
 the driver refuses it, the layer logs it and uses the default priority.

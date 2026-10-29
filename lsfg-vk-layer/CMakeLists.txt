@@ -14,8 +14,12 @@ target_compile_options(lsfg-vk-layer PRIVATE
     -Wno-unknown-warning-option
     -Wno-unsafe-buffer-usage) # Array indexing
 
+target_link_options(lsfg-vk-layer PRIVATE
+    "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/lsfg-vk-layer.map")
+
 set_target_properties(lsfg-vk-layer PROPERTIES
-    CXX_VISIBILITY_PRESET hidden)
+    CXX_VISIBILITY_PRESET hidden
+    LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/lsfg-vk-layer.map")
 
 set(LSFGVK_LAYER_ENABLE_ENVIRONMENT_JSON "")
 if(LSFGVK_LAYER_ENABLE_ENVIRONMENT)

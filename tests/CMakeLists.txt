@@ -53,6 +53,11 @@ add_test(NAME lsfg-vk-manifest-test
 set_tests_properties(lsfg-vk-config-test lsfg-vk-running-signal-test lsfg-vk-manifest-test PROPERTIES
     TIMEOUT 120)
 
+if(TARGET lsfg-vk-layer)
+    add_test(NAME lsfg-vk-layer-exports-test
+        COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/check-layer-exports.sh" "$<TARGET_FILE:lsfg-vk-layer>" "${CMAKE_NM}")
+endif()
+
 find_program(LSFGVK_LOCALEDEF localedef)
 if(LSFGVK_LOCALEDEF AND EXISTS "/usr/share/i18n/locales/de_DE")
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/locale")

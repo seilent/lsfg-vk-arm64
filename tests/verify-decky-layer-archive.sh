@@ -47,4 +47,6 @@ if readelf -d "$lib" | grep -qE 'Shared library: \[(libstdc\+\+|libgcc_s)'; then
     exit 1
 fi
 
+bash "$(dirname "${BASH_SOURCE[0]}")/check-layer-exports.sh" "$lib"
+
 echo "verified $archive_path ($architecture)"
