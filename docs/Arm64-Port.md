@@ -21,12 +21,25 @@ for the Armada glibc layer: it targets Android/bionic and is a different Vulkan
 image-sharing ABI. Armada packages therefore use the glibc-aarch64 target and
 the same static `libstdc++`/`libgcc` runtime policy as the x86 Decky bundle.
 
-The layer links with the version script `lsfg-vk-layer/lsfg-vk-layer.map`,
+The Linux layer links with the version script `lsfg-vk-layer/lsfg-vk-layer.map`,
 which exports only `vkNegotiateLoaderLayerInterfaceVersion`. The static C++
 runtime and the C++ code compiled into the layer stay out of its exported
 symbols. With them exported, Proton processes crash in the layer while it
 parses a float in the config. `tests/check-layer-exports.sh` checks the export
 list in `ctest` and in `tests/verify-decky-layer-archive.sh`.
+
+The AOSP layer is an NDK build with `-DLSFGVK_AOSP_LAYER=ON`. It adds
+`lsfg-vk-layer/src/android.cpp`, reads the process name from
+`/proc/self/cmdline`, links with `lsfg-vk-layer/lsfg-vk-layer-android.map` and
+`-Bsymbolic`, and names the library `libVkLayer_lsfg.so`, the name pattern the
+AOSP loader finds.
+That script also exports the six functions the AOSP loader looks up:
+`vkEnumerateInstanceLayerProperties`, `vkEnumerateInstanceExtensionProperties`,
+`vkEnumerateDeviceLayerProperties`, `vkEnumerateDeviceExtensionProperties`,
+`vkGetInstanceProcAddr` and `vkGetDeviceProcAddr`. Its system properties, pass
+through cases and logcat tag are in [Configuration.md](Configuration.md#android-system-properties).
+The option is off by default, so the Android bundles of
+`scripts/build-layer-bundles.sh` build the plain layer.
 
 The backend device asks for a high priority queue (`VK_EXT_global_priority`). When
 the driver refuses it, the layer logs it and uses the default priority.

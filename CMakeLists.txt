@@ -13,6 +13,7 @@ set(LSFGVK_LAYER_ENABLE_ENVIRONMENT "" CACHE STRING "Environment variable that m
 set(LSFGVK_VULKAN_HEADERS_DIR "" CACHE PATH "Optional custom Vulkan-Headers include directory")
 option(LSFGVK_TESTING_RENDERDOC  "Enable RenderDoc integration for testing purposes" OFF)
 option(LSFGVK_BUILD_TESTS        "Build the tests"                   OFF)
+option(LSFGVK_AOSP_LAYER         "Build the layer for the AOSP loader" OFF)
 # === READ HERE FOR BUILD OPTIONS ===
 
 add_library(lsfg-vk-build-config INTERFACE)
@@ -54,6 +55,13 @@ endif()
 
 if(LSFGVK_TESTING_RENDERDOC)
     add_compile_definitions(LSFGVK_TESTING_RENDERDOC)
+endif()
+
+if(LSFGVK_AOSP_LAYER)
+    if(NOT ANDROID)
+        message(FATAL_ERROR "LSFGVK_AOSP_LAYER needs an Android NDK build")
+    endif()
+    add_compile_definitions(LSFGVK_AOSP_LAYER)
 endif()
 
 add_subdirectory(lsfg-vk-common)

@@ -151,13 +151,23 @@ namespace {
             return VK_ERROR_INITIALIZATION_FAILED;
         }
 
+#ifdef LSFGVK_AOSP_LAYER
+        bool created{};
+#endif
         try {
             VkInstanceCreateInfo newInfo = *info;
             layer_info->root.modifyInstanceCreateInfo(newInfo,
-                [=, newInfo = &newInfo]() {
+                [=, newInfo = &newInfo
+#ifdef LSFGVK_AOSP_LAYER
+                    , &created
+#endif
+                ]() {
                     auto res = vkCreateInstance(newInfo, alloc, instance);
                     if (res != VK_SUCCESS)
                         throw ls::vulkan_error(res, "vkCreateInstance() failed");
+#ifdef LSFGVK_AOSP_LAYER
+                    created = true;
+#endif
                 }
             );
 
@@ -171,6 +181,14 @@ namespace {
 
             return VK_SUCCESS;
         } catch (const ls::vulkan_error& e) {
+#ifdef LSFGVK_AOSP_LAYER
+            if (created) {
+                auto* vkDestroyInstance = reinterpret_cast<PFN_vkDestroyInstance>(
+                    layer_info->GetInstanceProcAddr(*instance, "vkDestroyInstance"));
+                if (vkDestroyInstance)
+                    vkDestroyInstance(*instance, alloc);
+            }
+#endif
             if (e.error() == VK_ERROR_EXTENSION_NOT_PRESENT)
                 std::cerr << "lsfg-vk: required Vulkan instance extensions are not present. "
                     "Your GPU driver is not supported.\n";

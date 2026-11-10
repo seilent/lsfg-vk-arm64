@@ -84,7 +84,11 @@ Identification ls::identify() {
         }
     }
 
-    // fetch process name
+#ifdef LSFGVK_AOSP_LAYER
+    std::ifstream cmdline("/proc/self/cmdline");
+    if (cmdline.is_open())
+        std::getline(cmdline, id.process_name, '\0');
+#else
     std::ifstream comm("/proc/self/comm");
     if (comm.is_open()) {
         comm.read(buf.data(), buf.size() - 1);
@@ -94,6 +98,7 @@ Identification ls::identify() {
         if (id.process_name.back() == '\n')
             id.process_name.pop_back();
     }
+#endif
 
     return id;
 }

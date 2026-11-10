@@ -39,13 +39,20 @@ target_link_libraries(lsfg-vk-running-signal-test PRIVATE lsfg-vk-common)
 target_link_options(lsfg-vk-running-signal-test
     PRIVATE "LINKER:--wrap=openat" "LINKER:--wrap=flock")
 
-set_target_properties(lsfg-vk-shader-ids lsfg-vk-config-test lsfg-vk-running-signal-test PROPERTIES
+add_executable(lsfg-vk-android-pacing-test "android_pacing.cpp")
+target_include_directories(lsfg-vk-android-pacing-test
+    PRIVATE "../lsfg-vk-layer/src")
+
+set_target_properties(lsfg-vk-shader-ids lsfg-vk-config-test lsfg-vk-running-signal-test
+    lsfg-vk-android-pacing-test PROPERTIES
     CXX_CLANG_TIDY "")
 
 add_test(NAME lsfg-vk-config-test
     COMMAND lsfg-vk-config-test "${LSFGVK_TEST_FIXTURES}" "${LSFGVK_TEST_SCRATCH}/config")
 add_test(NAME lsfg-vk-running-signal-test
     COMMAND lsfg-vk-running-signal-test "${LSFGVK_TEST_SCRATCH}/running-signal")
+add_test(NAME lsfg-vk-android-pacing-test
+    COMMAND lsfg-vk-android-pacing-test)
 add_test(NAME lsfg-vk-manifest-test
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/manifest.py"
         "${CMAKE_COMMAND}" "${CMAKE_GENERATOR}" "${CMAKE_CXX_COMPILER}"

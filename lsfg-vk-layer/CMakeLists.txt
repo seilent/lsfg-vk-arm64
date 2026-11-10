@@ -14,12 +14,21 @@ target_compile_options(lsfg-vk-layer PRIVATE
     -Wno-unknown-warning-option
     -Wno-unsafe-buffer-usage) # Array indexing
 
+set(LAYER_MAP "${CMAKE_CURRENT_SOURCE_DIR}/lsfg-vk-layer.map")
+if(LSFGVK_AOSP_LAYER)
+    target_sources(lsfg-vk-layer PRIVATE "src/android.cpp")
+    target_link_libraries(lsfg-vk-layer PRIVATE log)
+    target_link_options(lsfg-vk-layer PRIVATE "LINKER:-Bsymbolic")
+    set(LAYER_MAP "${CMAKE_CURRENT_SOURCE_DIR}/lsfg-vk-layer-android.map")
+    set_target_properties(lsfg-vk-layer PROPERTIES OUTPUT_NAME VkLayer_lsfg)
+endif()
+
 target_link_options(lsfg-vk-layer PRIVATE
-    "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/lsfg-vk-layer.map")
+    "LINKER:--version-script=${LAYER_MAP}")
 
 set_target_properties(lsfg-vk-layer PROPERTIES
     CXX_VISIBILITY_PRESET hidden
-    LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/lsfg-vk-layer.map")
+    LINK_DEPENDS "${LAYER_MAP}")
 
 set(LSFGVK_LAYER_ENABLE_ENVIRONMENT_JSON "")
 if(LSFGVK_LAYER_ENABLE_ENVIRONMENT)

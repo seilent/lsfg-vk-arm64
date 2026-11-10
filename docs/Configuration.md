@@ -58,3 +58,20 @@ If you do not wish to use a configuration file, you can also set configuration o
 With `LSFGVK_ENV=1`, lsfg-vk checks Lossless.dll (`LSFGVK_DLL_PATH`, or the one found in the default locations) when the layer loads, the fp16 shaders too unless `LSFGVK_NO_FP16=1`. If Lossless.dll is not found or a shader it needs is missing or not SPIR-V, the layer does not load and the application runs without frame generation.
 
 In that mode, a process holds an exclusive `flock` on `~/.cache/lsfg-vk/active/<SteamGameId>-<pid>` from its first frame generation swapchain until it exits (`0` in place of a missing or non numeric `SteamGameId`). A `<digits>-<digits>` file there whose lock can be taken is left from a process that ended; the next one to start removes it.
+
+### Android System Properties
+
+The AOSP layer (`LSFGVK_AOSP_LAYER`, see [Arm64-Port.md](Arm64-Port.md)) reads system properties:
+- `debug.lsfgvk.multiplier`: Frame generation multiplier. Unset or `1` is no frame generation.
+- `debug.lsfgvk.flow_scale`: Flow scale value.
+- `debug.lsfgvk.performance_mode`: If set to `1`, performance mode will be enabled.
+- `debug.lsfgvk.dll_path`: Path to Lossless Scaling DLL.
+- `debug.lsfgvk.fps`: Frame limit, read live on every present. `0` or unset is no limit.
+
+The multiplier is checked at every `vkCreateInstance`. The first instance with frame generation sets `LSFGVK_ENV=1` and copies the first four properties to `LSFGVK_MULTIPLIER`, `LSFGVK_FLOW_SCALE`, `LSFGVK_PERFORMANCE_MODE` and `LSFGVK_DLL_PATH`, once per process.
+
+An instance passes through without frame generation when the multiplier is unset or `1`, for zink's own instance (engine name `mesa zink`), and with `DISABLE_LSFGVK` set. It also passes through when frame generation fails to load, and when the instance or device fails to create with the extensions frame generation adds. A failure inside frame generation's own device setup shows as a failed swapchain creation.
+
+The frame limit paces the application's own presents, the base frames, with and without frame generation. A process has one deadline, so two swapchains presenting in turn share the limit.
+
+The layer logs to logcat with the tag `lsfgvk`.
